@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  '
+  This template creates a VPC with a single ec2 instance, the instance will get apache installed on it.
+  '
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.nano
+    AllowedValues: 
+      - t3.nano
+      - t3.small
+      - t3.medium
+    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      "AMI": "ami-0b69ea66ff7391e80"
+    ap-southeast-2: 
+      "AMI": "ami-03ed5bd63ba378bd8"
+Resources:
+  myVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsHostnames: "true"
+      EnableDnsSupport: "true"
+      CidrBlock: 10.0.0.0/16
+      Tags:
+        - Key: Name
+          Value:
+            Ref: AWS::StackName
+  myInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        - Key: Name
+          Value:
+            !Ref AWS::StackName
+  myVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId:
+        !Ref myInternetGateway
+      VpcId:
+        !Ref myVPC
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value:
+            !Sub ${AWS::StackName}-PublicSubnet1
+      MapPublicIpOnLaunch: "true"
+      VpcId:
+        Ref: myVPC
+      CidrBlock: 10.0.1.0/24
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Public Routes
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: myVPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref myInternetGateway
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  EC2instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: Martin-MacBook
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds: 
+        - !GetAtt InstanceSecurityGroup.GroupId
+      UserData:
+        "Fn::Base64":
+          !Sub |
+            #!/bin/bash
+            yum update -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource EC2instance --region ${AWS::Region}
+            yum -y update
+      Tags:
+        - Key: Name
+          Value:
+            !Sub ${AWS::StackName}-1
+      InstanceType:
+        !Ref InstanceType
+      ImageId:
+        !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum: 
+              httpd: []
+          files: 
+            /var/www/html/index.html: 
+              content: !Sub | 
+                <h1>${AWS::StackName}</h1>
+                <h1>${AWS::Region}</h1>
+          services:
+            sysvinit:
+              httpd: 
+                enabled: "true"
+                ensureRunning: "true"
+                files: 
+                  - "/var/www/html/index.html"
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow http to client host
+        VpcId:
+          Ref: myVPC
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+Outputs:
+  publicIP:
+    Value: !GetAtt EC2instance.PublicIp
+  publicDNS:
+    Value: !GetAtt EC2instance.PublicDnsName
+
