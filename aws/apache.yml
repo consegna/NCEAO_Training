@@ -46,14 +46,14 @@ Resources:
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
+      MapPublicIpOnLaunch: "true"
+      VpcId:
+        !Ref myVPC
+      CidrBlock: 10.0.1.0/24
       Tags:
         - Key: Name
           Value:
             !Sub ${AWS::StackName}-PublicSubnet1
-      MapPublicIpOnLaunch: "true"
-      VpcId:
-        Ref: myVPC
-      CidrBlock: 10.0.1.0/24
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -77,7 +77,8 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       KeyName: Martin-MacBook
-      SubnetId: !Ref PublicSubnet1
+      SubnetId:
+        !Ref PublicSubnet1
       SecurityGroupIds: 
         - !GetAtt InstanceSecurityGroup.GroupId
       UserData:
@@ -103,9 +104,7 @@ Resources:
               httpd: []
           files: 
             /var/www/html/index.html: 
-              content: !Sub | 
-                <h1>${AWS::StackName}</h1>
-                <h1>${AWS::Region}</h1>
+              source: "https://raw.githubusercontent.com/martyca/NCEAO_Training/master/site/index.html"
           services:
             sysvinit:
               httpd: 
@@ -129,4 +128,3 @@ Outputs:
     Value: !GetAtt EC2instance.PublicIp
   publicDNS:
     Value: !GetAtt EC2instance.PublicDnsName
-
