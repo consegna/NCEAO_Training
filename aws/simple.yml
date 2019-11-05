@@ -1,5 +1,3 @@
-AWSTemplateFormatVersion: 2010-09-09
-Description: "simplest template ever"
 Resources:
   mys3bucket:
     Type: AWS::S3::Bucket

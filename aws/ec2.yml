@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This template creates a VPC with a single ec2 instance, the instance will get apache installed on it."
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.nano
+    AllowedValues: 
+      - t3.nano
+      - t3.small
+      - t3.medium
+    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Enter keyname
+  vpcstack:
+    Type: String
+    Description: vpc cloudformation stack
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      "AMI": "ami-0b69ea66ff7391e80"
+    ap-southeast-2: 
+      "AMI": "ami-03ed5bd63ba378bd8"
+Resources:
+  EC2instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName:
+        !Ref KeyName
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${vpcstack}-subnet"
+      SecurityGroupIds: 
+        - !GetAtt InstanceSecurityGroup.GroupId
+      UserData:
+        "Fn::Base64":
+          !Sub |
+            #!/bin/bash
+            yum update -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource EC2instance --region ${AWS::Region}
+            yum -y update
+      Tags:
+        - Key: Name
+          Value:
+            !Sub ${AWS::StackName}-Apache
+      InstanceType:
+        !Ref InstanceType
+      ImageId:
+        !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum: 
+              httpd: []
+          files: 
+            /var/www/html/index.html: 
+              source: "https://raw.githubusercontent.com/martyca/NCEAO_Training/master/site/index.html"
+          services:
+            sysvinit:
+              httpd: 
+                enabled: "true"
+                ensureRunning: "true"
+                files: 
+                  - "/var/www/html/index.html"
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow http to client host
+        VpcId:
+          Fn::ImportValue:
+            !Sub "${vpcstack}-vpc"
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+Outputs:
+  publicIP:
+    Value: !GetAtt EC2instance.PublicIp
+  publicDNS:
+    Value: !GetAtt EC2instance.PublicDnsName
