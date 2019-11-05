@@ -1,8 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: |
-  '
-  This template creates a VPC with a single ec2 instance, the instance will get apache installed on it.
-  '
+Description: "This template creates a VPC with a single ec2 instance, the instance will get apache installed on it."
 Parameters:
   InstanceType:
     Type: String
@@ -12,6 +9,9 @@ Parameters:
       - t3.small
       - t3.medium
     Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Enter keyname
 Mappings: 
   RegionMap: 
     us-east-1: 
@@ -76,7 +76,8 @@ Resources:
   EC2instance:
     Type: AWS::EC2::Instance
     Properties:
-      KeyName: Martin-MacBook
+      KeyName:
+        !Ref KeyName
       SubnetId:
         !Ref PublicSubnet1
       SecurityGroupIds: 
@@ -91,7 +92,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            !Sub ${AWS::StackName}-1
+            !Sub ${AWS::StackName}-Apache
       InstanceType:
         !Ref InstanceType
       ImageId:
